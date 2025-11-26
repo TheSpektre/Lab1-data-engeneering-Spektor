@@ -1,8 +1,3 @@
-"""
-ETL pipeline for weather data collection
-Extracts data from Open-Meteo API, stores in MinIO and ClickHouse,
-sends notifications to Telegram
-"""
 import requests
 from datetime import datetime, timedelta
 import json

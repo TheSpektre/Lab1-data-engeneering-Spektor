@@ -1,7 +1,3 @@
-"""
-Create tables in ClickHouse for weather data
-"""
-
 from clickhouse_driver import Client
 
 
