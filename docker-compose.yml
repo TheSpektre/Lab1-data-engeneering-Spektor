@@ -1,0 +1,72 @@
+services:
+  prefect-server:
+    image: prefecthq/prefect:2-python3.11
+    command: prefect server start --host 0.0.0.0
+    ports:
+      - "4200:4200"
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+      - PREFECT_SERVER_API_HOST=0.0.0.0
+    networks:
+      - prefect-network
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    networks:
+      - prefect-network
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - "8123:8123"
+    environment:
+      CLICKHOUSE_USER: admin
+      CLICKHOUSE_PASSWORD: password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - prefect-network
+
+  prefect-worker:
+    build:
+      context: .
+      dockerfile: prefect_worker.dockerfile
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_USER=admin
+      - CLICKHOUSE_PASSWORD=password
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    volumes:
+      - ./flows:/app/flows
+    depends_on:
+      - prefect-server
+      - minio
+      - clickhouse
+    networks:
+      - prefect-network
+    command: >
+      sh -c "sleep 30 &&
+             python /app/flows/create_tables.py &&
+             prefect worker start --pool default-pool --type process"
+
+volumes:
+  minio_data:
+  clickhouse_data:
+
+networks:
+  prefect-network:
+    driver: bridge
